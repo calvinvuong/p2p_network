@@ -236,6 +236,10 @@ class NeighborThread implements Runnable {
 		    System.out.println(peerIP + " disconnected.");
 		}
 	    }
+	    catch (SocketException e) {
+		System.out.println(alive.get()); // diagnostic
+		System.out.println("Connection to " + neighborIP + " closed.");
+	    }
 	    catch (Exception e) {
 		e.printStackTrace();
 	    }
