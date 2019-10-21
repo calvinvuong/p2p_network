@@ -20,8 +20,6 @@ public class p2p {
 	System.out.println("Starting peer...");
 	readPorts(); // read port nums from config file
 	try {
-	    localIP = InetAddress.getLocalHost();
-
 	    // create welcome sockets
 	    welcomeNeighborSocket = new ServerSocket(neighborPort);
 	    welcomeTransferSocket = new ServerSocket(transferPort);
@@ -56,16 +54,21 @@ public class p2p {
     }
     
 
-    // Sets the port numbers for this peer based on config file.
+    // Sets the IP port numbers for this peer based on config file.
     // First port in config file is neighbor port
+    // Second port is the transfer port
     public static void readPorts() {
 	try {
 	    File peerConfig = new File("config_peer.txt");
 	    Scanner scan = new Scanner(peerConfig);
+	    localIP = InetAddress.getByName(scan.nextLine());
 	    neighborPort = Integer.parseInt(scan.nextLine());
 	    transferPort = Integer.parseInt(scan.nextLine());
 	}
 	catch (FileNotFoundException e) {
+	    e.printStackTrace();
+	}
+	catch (UnknownHostException e) {
 	    e.printStackTrace();
 	}
     }
