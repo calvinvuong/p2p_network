@@ -237,6 +237,7 @@ class NeighborThread implements Runnable {
 
 	while (alive.get()) { // run loop while connection is alive
 	    try {
+		//System.out.println("hi");
 		String incoming = in.readLine();
 		if ( incoming != null && incoming.startsWith("H") ) {
 		    System.out.println("Received heartbeat from: " + incoming);
@@ -250,9 +251,9 @@ class NeighborThread implements Runnable {
 		    System.out.println(peerIP + " disconnected.");
 		}
 	    }
-	    //catch (SocketTimeoutException e) { // did not receive heartbeat for a while
-	    //		e.printStackTrace();
-	    //}
+	    catch (SocketTimeoutException e) { // did not receive heartbeat for a while
+		System.out.println("timeout");
+	    }
 	    catch (SocketException e) { // indicates socket closed
 		//System.out.println(alive.get()); // diagnostic
 		alive.set(false);
@@ -262,6 +263,7 @@ class NeighborThread implements Runnable {
 		e.printStackTrace();
 	    }
 	}
+	System.out.println("Thread finished.");
     }
 
     // Terminates connection between local host and one peer
