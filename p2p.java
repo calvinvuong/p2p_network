@@ -38,7 +38,6 @@ public class p2p {
 		    connectNeighbors();
 		else if (userInput.equals("Leave")) {
 		    disconnectAllNeighbors();
-		    break; // exit loop (program)
 		}
 		
 	    }
@@ -236,8 +235,9 @@ class NeighborThread implements Runnable {
 		    System.out.println(peerIP + " disconnected.");
 		}
 	    }
-	    catch (SocketException e) {
-		System.out.println(alive.get()); // diagnostic
+	    catch (SocketException e) { // indicates socket closed
+		//System.out.println(alive.get()); // diagnostic
+		alive.set(false);
 		System.out.println("Connection to " + neighborIP + " closed.");
 	    }
 	    catch (Exception e) {
