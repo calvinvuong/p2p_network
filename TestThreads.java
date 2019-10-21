@@ -37,7 +37,6 @@ public class TestThreads {
 }
 
 class MyThread implements Runnable {
-    private Thread t;
     private String name;
     private String add;
     private ArrayList<String> alter;
