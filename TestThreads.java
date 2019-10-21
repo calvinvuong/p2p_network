@@ -1,6 +1,7 @@
 import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.*;
+import java.net.InetAddress;
 
 public class TestThreads {
     String s = "hello";
@@ -9,6 +10,12 @@ public class TestThreads {
     ArrayList<String> list;
     
     public static void main(String[] args) {
+	try {
+	    System.out.println(InetAddress.getLocalHost().getHostAddress());
+	}
+	catch (Exception e) {
+	    e.printStackTrace();
+	}
 	TestThreads app = new TestThreads();
 	app.runThreads();
     }

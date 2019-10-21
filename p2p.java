@@ -4,6 +4,7 @@ import java.io.*;
 import java.net.*;
 import java.util.Scanner;
 import java.util.*;
+import java.util.concurrent.atomic.*;
 
 public class p2p {
 
@@ -159,8 +160,9 @@ class ClientConnectThread implements Runnable {
 }
 
 // Handles operations relating to the an already-established socket between connected ppers
+// Listens for Heartbeats
 class NeighborThread implements Runnable {
-    Boolean alive; // determines if this thread is still alive
+    volatile AtomicBoolean alive; // determines if this thread is still alive
     Socket connectionSocket;
     BufferedReader in; // in from neighbor
     DataOutputStream out; // out to neighbor
@@ -168,7 +170,7 @@ class NeighborThread implements Runnable {
     volatile List<Socket> sockets;
     
     public NeighborThread(Socket connection, List<InetAddress> neighborIPs, List<Socket> existingSockets) {
-	alive = new Boolean(true);
+	alive = new AtomicBoolean(true);
 	connectionSocket = connection;
 	IPConnections = neighborIPs;
 	sockets = existingSockets;
@@ -188,7 +190,48 @@ class NeighborThread implements Runnable {
     }
 }
 
-// Handles heartbeat
+// Sends Hearbeat message to neighbor
+// Thread ends if alive is false
 // Spawned by a NeighborThread
-//class HeartbeatThread implements Runnable {
+class HeartbeatThread implements Runnable {
+    volatile AtomicBoolean alive;
+    Socket connectionSocket;
+    InetAddress neighborIP;
+    DataOutputStream out; // out ot neighbor
+    long time;
+    String message; // heartbeat message
     
+    public HeartbeatThread(Socket connection, AtomicBoolean aliveFlag, DataOutputStream outToNeighbor) {
+	connectionSocket = connection;
+	alive = aliveFlag;
+	out = outToNeighbor;
+	time = System.currentTimeMillis();
+	neighborIP = connectionSocket.getInetAddress();
+	try {
+	    String localIP = InetAddress.getLocalHost().getHostAddress();
+	    message = "H:" + localIP + "\n";
+	}
+	catch (UnknownHostException e) {
+	    e.printStackTrace();
+	}
+    }
+
+    @Override
+    public void run() {
+	while ( alive.get() ) { // connection still alive
+	    try {
+		out.writeBytes(message);
+		System.out.println("Heartbeat sent to: " + neighborIP);
+		Thread.sleep(2*1000); // sleep for 2 seconds
+	    }
+	    catch (Exception e) {
+		e.printStackTrace();
+	    }
+	}
+    }
+}
+
+	
+
+    
+	
