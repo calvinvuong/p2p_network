@@ -25,7 +25,9 @@ public class p2p {
 	    // create welcome sockets
 	    welcomeNeighborSocket = new ServerSocket(neighborPort);
 	    welcomeTransferSocket = new ServerSocket(transferPort);
-	
+
+	    //localIP = welcomeNeighborSocket.getInetAddress();
+	    
 	    // create therad to welcome connections
 	    Thread welcomeThread = new Thread( new WelcomeThread(welcomeNeighborSocket, welcomeTransferSocket, IPConnections, sockets) );
 	    welcomeThread.start();
@@ -80,7 +82,7 @@ public class p2p {
 		String[] IPPortTuple = line.split(" ");
 		InetAddress neighborIP = InetAddress.getByName(IPPortTuple[0]);
 		int neighborPort = Integer.parseInt(IPPortTuple[1]);
-
+		
 		// check if there is already an established connection to the IP
 		synchronized(IPConnections) {
 		    if ( IPConnections.contains(neighborIP) ) 
@@ -303,13 +305,14 @@ class HeartbeatThread implements Runnable {
 	out = outToNeighbor;
 	time = System.currentTimeMillis();
 	neighborIP = connectionSocket.getInetAddress();
-	try {
-	    String localIP = InetAddress.getLocalHost().getHostAddress();
+	//try {
+	    String localIP = connectionSocket.getLocalAddress().getHostAddress();
+	    System.out.println(localIP);
 	    message = "H:" + localIP + "\n";
-	}
-	catch (UnknownHostException e) {
-	    e.printStackTrace();
-	}
+	    //}
+	//catch (UnknownHostException e) {
+	//   e.printStackTrace();
+	//}
     }
 
     @Override
