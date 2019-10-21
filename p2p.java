@@ -109,6 +109,7 @@ public class p2p {
 		    out.writeBytes(goodbyeMessage);
 		    sockets.get(i).close(); // close socket
 		}
+		sockets.clear();
 	    }
 	}
 	catch (IOException e) {
