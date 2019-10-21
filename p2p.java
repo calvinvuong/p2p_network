@@ -208,6 +208,7 @@ class NeighborThread implements Runnable {
     BufferedReader in; // in from neighbor
     DataOutputStream out; // out to neighbor
     long lastHeartbeat; // time in millsec of last heartbeat
+    final int HEARTBEAT_TIMEOUT = 12; // number of seconds to wait for heartbeat / or any other message
     volatile List<InetAddress> IPConnections;
     volatile List<Socket> sockets;
     
@@ -237,67 +238,70 @@ class NeighborThread implements Runnable {
 
 	while (alive.get()) { // run loop while connection is alive
 	    try {
-		//System.out.println("hi");
+		// check if heartbeat timer expired
+		if ( System.currentTimeMillis() - lastHeartbeat > HEARTBEAT_TIMEOUT * 1000 ) {
+		    System.out.println("Heartbeat timeout on " + neighborIP);
+		    disconnectNeighbor(neighborIP);
+		    System.out.println(neighborIP + " disconnected.");
+		}
 		String incoming = in.readLine();
 		if ( incoming != null && incoming.startsWith("H") ) {
 		    System.out.println("Received heartbeat from: " + incoming);
-		    // reset timer
+		    lastHeartbeat = System.currentTimeMillis();
 		}
 		else if ( incoming != null && incoming.startsWith("G") ) { // neighbor has left
 		    // get IP of peer that sent goodbye
 		    String peerIP = incoming.split(":")[1];
 		    System.out.println(peerIP + " wants to disconnect.");
-		    disconnectNeighbor(peerIP);
+		    disconnectNeighbor(InetAddress.getByName(peerIP));
 		    System.out.println(peerIP + " disconnected.");
 		}
 	    }
 	    catch (SocketTimeoutException e) { // did not receive heartbeat for a while
 		System.out.println("timeout");
 	    }
-	    catch (SocketException e) { // indicates socket closed
-		//System.out.println(alive.get()); // diagnostic
-		alive.set(false);
-		System.out.println("Connection to " + neighborIP + " closed.");
-	    }
+	    /*
+	      catch (SocketException e) { // indicates socket closed
+	      //System.out.println(alive.get()); // diagnostic
+	      alive.set(false);
+	      System.out.println("Connection to " + neighborIP + " closed.");
+	      System.out.println(IPConnections);
+	      }
+	    */
 	    catch (Exception e) {
 		e.printStackTrace();
 	    }
 	}
-	System.out.println("Thread finished.");
     }
 
     // Terminates connection between local host and one peer
     // Does not send goodbye message
-    public void disconnectNeighbor(String peerIPString) {
+    public void disconnectNeighbor(InetAddress peerIP) {
 	synchronized(IPConnections) {
-	    try {
-		InetAddress peerIP = InetAddress.getByName(peerIPString);
-		// remove this peer from list of connection IP addresses
-		for ( int i = 0; i < IPConnections.size(); i++ ) {
-		    if ( IPConnections.get(i).equals(peerIP) ) {
-			IPConnections.remove(i);
-			break;
-		    }
+	    //InetAddress peerIP = InetAddress.getByName(peerIPString);
+	    // remove this peer from list of connection IP addresses
+	    for ( int i = 0; i < IPConnections.size(); i++ ) {
+		if ( IPConnections.get(i).equals(peerIP) ) {
+		    IPConnections.remove(i);
+		    break;
 		}
-		// close socket to this peer, and remove from list of sockets
-		for ( int i = 0; i < sockets.size(); i++ ) {
-		    if ( sockets.get(i).getInetAddress().equals(peerIP) ) {
-			try {
-			    sockets.get(i).close();
-			    sockets.remove(i);
-			}
-			catch (IOException e) {
-			    e.printStackTrace();
-			}
-			break;
+	    }
+	    // close socket to this peer, and remove from list of sockets
+	    for ( int i = 0; i < sockets.size(); i++ ) {
+		if ( sockets.get(i).getInetAddress().equals(peerIP) ) {
+		    try {
+			sockets.get(i).close();
+			sockets.remove(i);
 		    }
+		    catch (IOException e) {
+			e.printStackTrace();
+		    }
+		    break;
 		}
-		//
-		alive.set(false);
 	    }
-	    catch (UnknownHostException e) {
-		e.printStackTrace();
-	    }
+	    //
+	    alive.set(false);
+
 	}
     }
     
