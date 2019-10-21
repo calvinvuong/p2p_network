@@ -128,6 +128,7 @@ public class p2p {
 class WelcomeThread implements Runnable {
     ServerSocket welcomeNeighborSocket;
     ServerSocket welcomeTransferSocket;
+    final int HEARTBEAT_TIMEOUT = 12; // number of seconds to wait for heartbeat / or any other message
     volatile List<InetAddress> IPConnections;
     volatile List<Socket> sockets;
     
@@ -144,6 +145,8 @@ class WelcomeThread implements Runnable {
 	    try {
 		System.out.println("...listening");
 		Socket neighborSocket = welcomeNeighborSocket.accept();
+		neighborSocket.setSoTimeout(HEARTBEAT_TIMEOUT * 1000);
+		
 		System.out.println("New connection: " + neighborSocket.getInetAddress());
 		IPConnections.add(neighborSocket.getInetAddress());
 		sockets.add(neighborSocket);
@@ -162,6 +165,7 @@ class WelcomeThread implements Runnable {
 class ClientConnectThread implements Runnable {
     InetAddress neighborIP;
     int neighborPort;
+    final int HEARTBEAT_TIMEOUT = 12; // number of seconds to wait for heartbeat / or any other message
     volatile List<InetAddress> IPConnections;
     volatile List<Socket> sockets;
 
@@ -177,6 +181,8 @@ class ClientConnectThread implements Runnable {
 	try {
 	    System.out.println("Attempting connect to: " + neighborIP);
 	    Socket connectionSocket = new Socket(neighborIP, neighborPort);
+	    connectionSocket.setSoTimeout(HEARTBEAT_TIMEOUT * 1000);
+	    
 	    System.out.println("Successful connection to: " + neighborIP);
 	    IPConnections.add(neighborIP);
 	    sockets.add(connectionSocket);
@@ -201,8 +207,10 @@ class NeighborThread implements Runnable {
     InetAddress neighborIP; 
     BufferedReader in; // in from neighbor
     DataOutputStream out; // out to neighbor
+    long lastHeartbeat; // time in millsec of last heartbeat
     volatile List<InetAddress> IPConnections;
     volatile List<Socket> sockets;
+    
     
     public NeighborThread(Socket connection, List<InetAddress> neighborIPs, List<Socket> existingSockets) {
 	alive = new AtomicBoolean(true);
@@ -223,17 +231,18 @@ class NeighborThread implements Runnable {
     @Override
     public void run() {
 	System.out.println("Connected to: " + neighborIP);
+	lastHeartbeat = System.currentTimeMillis();
 	Thread heartbeat = new Thread( new HeartbeatThread(connectionSocket, alive, out, IPConnections) );
 	heartbeat.start();
 
 	while (alive.get()) { // run loop while connection is alive
 	    try {
 		String incoming = in.readLine();
-		if ( incoming.startsWith("H") ) {
+		if ( incoming != null && incoming.startsWith("H") ) {
 		    System.out.println("Received heartbeat from: " + incoming);
 		    // reset timer
 		}
-		else if ( incoming.startsWith("G") ) { // neighbor has left
+		else if ( incoming != null && incoming.startsWith("G") ) { // neighbor has left
 		    // get IP of peer that sent goodbye
 		    String peerIP = incoming.split(":")[1];
 		    System.out.println(peerIP + " wants to disconnect.");
@@ -241,6 +250,9 @@ class NeighborThread implements Runnable {
 		    System.out.println(peerIP + " disconnected.");
 		}
 	    }
+	    //catch (SocketTimeoutException e) { // did not receive heartbeat for a while
+	    //		e.printStackTrace();
+	    //}
 	    catch (SocketException e) { // indicates socket closed
 		//System.out.println(alive.get()); // diagnostic
 		alive.set(false);
@@ -297,8 +309,9 @@ class HeartbeatThread implements Runnable {
     Socket connectionSocket;
     InetAddress neighborIP;
     DataOutputStream out; // out ot neighbor
-    long time;
     String message; // heartbeat message
+    final int PULSE = 5; // seconds per heartbeat
+    
     List<InetAddress> IPConnections;
     
     public HeartbeatThread(Socket connection, AtomicBoolean aliveFlag, DataOutputStream outToNeighbor, List<InetAddress> allConnections) {
@@ -306,16 +319,12 @@ class HeartbeatThread implements Runnable {
 	IPConnections = allConnections;
 	alive = aliveFlag;
 	out = outToNeighbor;
-	time = System.currentTimeMillis();
 	neighborIP = connectionSocket.getInetAddress();
-	//try {
-	    String localIP = connectionSocket.getLocalAddress().getHostAddress();
-	    System.out.println(localIP);
-	    message = "H:" + localIP + "\n";
-	    //}
-	//catch (UnknownHostException e) {
-	//   e.printStackTrace();
-	//}
+
+	String localIP = connectionSocket.getLocalAddress().getHostAddress();
+	System.out.println(localIP);
+	message = "H:" + localIP + "\n";
+
     }
 
     @Override
@@ -327,7 +336,10 @@ class HeartbeatThread implements Runnable {
 	    try {
 		out.writeBytes(message);
 		System.out.println("Heartbeat sent to: " + neighborIP);
-		Thread.sleep(5*1000); // sleep for 2 seconds
+		Thread.sleep(PULSE*1000); // sleep for x seconds
+	    }
+	    catch (SocketException e) { // peer has disconnected
+		continue; // wait till heartbeat timeout to close
 	    }
 	    catch (Exception e) {
 		e.printStackTrace();
