@@ -245,8 +245,10 @@ class HeartbeatThread implements Runnable {
 
     @Override
     public void run() {
+	checkAlive();
 	while ( alive.get() ) { // connection still alive
-	    checkAlive();
+	    if ( ! checkAlive() ) // connection is dead; kill thread
+		return;
 	    try {
 		out.writeBytes(message);
 		System.out.println("Heartbeat sent to: " + neighborIP);
@@ -265,6 +267,7 @@ class HeartbeatThread implements Runnable {
 		if ( IPConnections.get(i).equals(neighborIP) )
 		    return true;
 	    }
+	    alive.set(false);
 	    return false;
 	}
     }
