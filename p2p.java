@@ -31,9 +31,11 @@ public class p2p {
 	    BufferedReader userInputBuffer = new BufferedReader( new InputStreamReader(System.in) );
 	    while (true) {
 		String userInput = userInputBuffer.readLine();
-		if (userInput.equals("Connect")) {
+		if (userInput.equals("Connect"))
 		    connectNeighbors();
-		}
+		else if (userInput.equals("Leave"))
+		    disconnectNeighbors();
+		
 	    }
 	
 	    /*
@@ -91,6 +93,20 @@ public class p2p {
 	    e.printStackTrace();
 	}
     }
+
+    public static void disconnectNeighbors() {
+	try {
+	    synchronized(IPConnections) {
+		for ( int i = 0; i < sockets.size(); i++ ) 
+		    sockets.get(i).close(); // close socket
+		IPConnections.clear();
+	    }
+	}
+	catch (IOException e) {
+	    e.printStackTrace();
+	}
+    }
+	
 }
 
 // Handles operations relating to welcome sockets
@@ -149,6 +165,9 @@ class ClientConnectThread implements Runnable {
 	    System.out.println("Successful connection to: " + neighborIP);
 	    IPConnections.add(neighborIP);
 	    sockets.add(connectionSocket);
+
+	    Thread neighborThread = new Thread( new NeighborThread(connectionSocket, IPConnections, sockets) );
+	    neighborThread.start();
 	}
 	catch (ConnectException e) {
 	    System.out.println("Connection to: " + neighborIP + " failed. Make sure that peer is running.");
@@ -160,10 +179,11 @@ class ClientConnectThread implements Runnable {
 }
 
 // Handles operations relating to the an already-established socket between connected ppers
-// Listens for Heartbeats
+// Listens for heartbeats, queries, and responses
 class NeighborThread implements Runnable {
     volatile AtomicBoolean alive; // determines if this thread is still alive
     Socket connectionSocket;
+    InetAddress neighborIP; 
     BufferedReader in; // in from neighbor
     DataOutputStream out; // out to neighbor
     volatile List<InetAddress> IPConnections;
@@ -172,6 +192,7 @@ class NeighborThread implements Runnable {
     public NeighborThread(Socket connection, List<InetAddress> neighborIPs, List<Socket> existingSockets) {
 	alive = new AtomicBoolean(true);
 	connectionSocket = connection;
+	neighborIP = connectionSocket.getInetAddress();
 	IPConnections = neighborIPs;
 	sockets = existingSockets;
 	
@@ -186,8 +207,8 @@ class NeighborThread implements Runnable {
 
     @Override
     public void run() {
-	System.out.println("Connected to: " + connectionSocket.getInetAddress());
-	Thread heartbeat = new Thread( new HeartbeatThread(connectionSocket, alive, out) );
+	System.out.println("Connected to: " + neighborIP);
+	Thread heartbeat = new Thread( new HeartbeatThread(connectionSocket, alive, out, IPConnections) );
 	heartbeat.start();
 
 	// listening loop
@@ -204,9 +225,11 @@ class HeartbeatThread implements Runnable {
     DataOutputStream out; // out ot neighbor
     long time;
     String message; // heartbeat message
+    List<InetAddress> IPConnections;
     
-    public HeartbeatThread(Socket connection, AtomicBoolean aliveFlag, DataOutputStream outToNeighbor) {
+    public HeartbeatThread(Socket connection, AtomicBoolean aliveFlag, DataOutputStream outToNeighbor, List<InetAddress> allConnections) {
 	connectionSocket = connection;
+	IPConnections = allConnections;
 	alive = aliveFlag;
 	out = outToNeighbor;
 	time = System.currentTimeMillis();
@@ -223,8 +246,8 @@ class HeartbeatThread implements Runnable {
     @Override
     public void run() {
 	while ( alive.get() ) { // connection still alive
+	    checkAlive();
 	    try {
-		System.out.println("Starting hearbeat");
 		out.writeBytes(message);
 		System.out.println("Heartbeat sent to: " + neighborIP);
 		Thread.sleep(2*1000); // sleep for 2 seconds
@@ -232,6 +255,17 @@ class HeartbeatThread implements Runnable {
 	    catch (Exception e) {
 		e.printStackTrace();
 	    }
+	}
+    }
+
+    // returns true if this connection is still alive, false otherwise
+    private boolean checkAlive() {
+	synchronized(IPConnections) {
+	    for ( int i = 0; i < IPConnections.size(); i++ ) {
+		if ( IPConnections.get(i).equals(neighborIP) )
+		    return true;
+	    }
+	    return false;
 	}
     }
 }
