@@ -268,6 +268,8 @@ class NeighborThread implements Runnable {
 			break;
 		    }
 		}
+		//
+		alive.set(false);
 	    }
 	    catch (UnknownHostException e) {
 		e.printStackTrace();
