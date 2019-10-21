@@ -186,7 +186,11 @@ class NeighborThread implements Runnable {
 
     @Override
     public void run() {
-	System.out.println("hi");
+	System.out.println("Connected to: " + connectionSocket.getInetAddress());
+	Thread heartbeat = new Thread( new HeartbeatThread(connectionSocket, alive, out) );
+	heartbeat.start();
+
+	// listening loop
     }
 }
 
@@ -220,6 +224,7 @@ class HeartbeatThread implements Runnable {
     public void run() {
 	while ( alive.get() ) { // connection still alive
 	    try {
+		System.out.println("Starting hearbeat");
 		out.writeBytes(message);
 		System.out.println("Heartbeat sent to: " + neighborIP);
 		Thread.sleep(2*1000); // sleep for 2 seconds
