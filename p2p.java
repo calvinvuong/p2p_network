@@ -18,9 +18,10 @@ public class p2p {
     
     public static void main(String[] args) {
 	System.out.println("Starting peer...");
-	localIP = InetAddress.getLocalHost();
 	readPorts(); // read port nums from config file
 	try {
+	    localIP = InetAddress.getLocalHost();
+
 	    // create welcome sockets
 	    welcomeNeighborSocket = new ServerSocket(neighborPort);
 	    welcomeTransferSocket = new ServerSocket(transferPort);
@@ -221,17 +222,22 @@ class NeighborThread implements Runnable {
 	heartbeat.start();
 
 	while (alive.get()) { // run loop while connection is alive
-	    String incoming = in.readLine();
-	    if ( incoming.startsWith("H") ) {
-		System.out.println("Received heartbeat from: " + incoming);
-		// reset timer
+	    try {
+		String incoming = in.readLine();
+		if ( incoming.startsWith("H") ) {
+		    System.out.println("Received heartbeat from: " + incoming);
+		    // reset timer
+		}
+		else if ( incoming.startsWith("G") ) { // neighbor has left
+		    // get IP of peer that sent goodbye
+		    String peerIP = incoming.split(":")[1];
+		    System.out.println(peerIP + " wants to disconnect.");
+		    disconnectNeighbor(peerIP);
+		    System.out.println(peerIP + " disconnected.");
+		}
 	    }
-	    else if ( incoming.startsWith("G") ) { // neighbor has left
-		// get IP of peer that sent goodbye
-		String peerIP = incoming.split(":")[1];
-		System.out.println(peerIP + " wants to disconnect.");
-		disconnectNeighbor(peerIP);
-		System.out.println(peerIP + " disconnected.");
+	    catch (Exception e) {
+		e.printStackTrace();
 	    }
 	}
     }
@@ -239,22 +245,32 @@ class NeighborThread implements Runnable {
     // Terminates connection between local host and one peer
     // Does not send goodbye message
     public void disconnectNeighbor(String peerIPString) {
-	InetAddress peerIP = InetAddress.getByName(peerIPString);
 	synchronized(IPConnections) {
-	    // remove this peer from list of connection IP addresses
-	    for ( int i = 0; i < IPConnections.size(); i++ ) {
-		if ( IPConnections.get(i).equals(peerIP) ) {
-		    IPConnections.remove(i);
-		    break;
+	    try {
+		InetAddress peerIP = InetAddress.getByName(peerIPString);
+		// remove this peer from list of connection IP addresses
+		for ( int i = 0; i < IPConnections.size(); i++ ) {
+		    if ( IPConnections.get(i).equals(peerIP) ) {
+			IPConnections.remove(i);
+			break;
+		    }
+		}
+		// close socket to this peer, and remove from list of sockets
+		for ( int i = 0; i < sockets.size(); i++ ) {
+		    if ( sockets.get(i).getInetAddress().equals(peerIP) ) {
+			try {
+			    sockets.get(i).close();
+			    sockets.remove(i);
+			}
+			catch (IOException e) {
+			    e.printStackTrace();
+			}
+			break;
+		    }
 		}
 	    }
-	    // close socket to this peer, and remove from list of sockets
-	    for ( int i = 0; i < sockets.size(); i++ ) {
-		if ( sockets.get(i).getInetAddress().equals(peerIP) ) {
-		    sockets.get(i).close();
-		    sockets.remove(i);
-		    break;
-		}
+	    catch (UnknownHostException e) {
+		e.printStackTrace();
 	    }
 	}
     }
