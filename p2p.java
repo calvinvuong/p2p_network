@@ -147,6 +147,9 @@ class ClientConnectThread implements Runnable {
 	    IPConnections.add(neighborIP);
 	    sockets.add(connectionSocket);
 	}
+	catch (ConnectException e) {
+	    System.out.println("Connection to: " + neighborIP + " failed. Make sure that peer is running.");
+	}
 	catch (Exception e) {
 	    e.printStackTrace();
 	}
