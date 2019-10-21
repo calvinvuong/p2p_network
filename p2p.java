@@ -3,7 +3,7 @@
 import java.io.*;
 import java.net.*;
 import java.util.Scanner;
-import java.util.ArrayList;
+import java.util.*;
 
 public class p2p {
 
