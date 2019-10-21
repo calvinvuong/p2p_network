@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.*;
 
 public class p2p {
 
+    static InetAddress localIP; // IP address of this peer
     static int neighborPort; // port num for neighbor connections
     static int transferPort; // port num for transfers
     static ServerSocket welcomeNeighborSocket;
@@ -17,6 +18,7 @@ public class p2p {
     
     public static void main(String[] args) {
 	System.out.println("Starting peer...");
+	localIP = InetAddress.getLocalHost();
 	readPorts(); // read port nums from config file
 	try {
 	    // create welcome sockets
@@ -33,8 +35,10 @@ public class p2p {
 		String userInput = userInputBuffer.readLine();
 		if (userInput.equals("Connect"))
 		    connectNeighbors();
-		else if (userInput.equals("Leave"))
-		    disconnectNeighbors();
+		else if (userInput.equals("Leave")) {
+		    disconnectAllNeighbors();
+		    break; // exit loop (program)
+		}
 		
 	    }
 	
@@ -94,12 +98,17 @@ public class p2p {
 	}
     }
 
-    public static void disconnectNeighbors() {
+    public static void disconnectAllNeighbors() {
 	try {
 	    synchronized(IPConnections) {
-		for ( int i = 0; i < sockets.size(); i++ ) 
-		    sockets.get(i).close(); // close socket
 		IPConnections.clear();
+		for ( int i = 0; i < sockets.size(); i++ )  {
+		    // send goodbye message
+		    String goodbyeMessage = "G:" + localIP.getHostAddress() + "\n";
+		    DataOutputStream out = new DataOutputStream(sockets.get(i).getOutputStream());
+		    out.writeBytes(goodbyeMessage);
+		    sockets.get(i).close(); // close socket
+		}
 	    }
 	}
 	catch (IOException e) {
@@ -211,8 +220,45 @@ class NeighborThread implements Runnable {
 	Thread heartbeat = new Thread( new HeartbeatThread(connectionSocket, alive, out, IPConnections) );
 	heartbeat.start();
 
-	// listening loop
+	while (alive.get()) { // run loop while connection is alive
+	    String incoming = in.readLine();
+	    if ( incoming.startsWith("H") ) {
+		System.out.println("Received heartbeat from: " + incoming);
+		// reset timer
+	    }
+	    else if ( incoming.startsWith("G") ) { // neighbor has left
+		// get IP of peer that sent goodbye
+		String peerIP = incoming.split(":")[1];
+		System.out.println(peerIP + " wants to disconnect.");
+		disconnectNeighbor(peerIP);
+		System.out.println(peerIP + " disconnected.");
+	    }
+	}
     }
+
+    // Terminates connection between local host and one peer
+    // Does not send goodbye message
+    public void disconnectNeighbor(String peerIPString) {
+	InetAddress peerIP = InetAddress.getByName(peerIPString);
+	synchronized(IPConnections) {
+	    // remove this peer from list of connection IP addresses
+	    for ( int i = 0; i < IPConnections.size(); i++ ) {
+		if ( IPConnections.get(i).equals(peerIP) ) {
+		    IPConnections.remove(i);
+		    break;
+		}
+	    }
+	    // close socket to this peer, and remove from list of sockets
+	    for ( int i = 0; i < sockets.size(); i++ ) {
+		if ( sockets.get(i).getInetAddress().equals(peerIP) ) {
+		    sockets.get(i).close();
+		    sockets.remove(i);
+		    break;
+		}
+	    }
+	}
+    }
+    
 }
 
 // Sends Hearbeat message to neighbor
@@ -252,7 +298,7 @@ class HeartbeatThread implements Runnable {
 	    try {
 		out.writeBytes(message);
 		System.out.println("Heartbeat sent to: " + neighborIP);
-		Thread.sleep(2*1000); // sleep for 2 seconds
+		Thread.sleep(5*1000); // sleep for 2 seconds
 	    }
 	    catch (Exception e) {
 		e.printStackTrace();
