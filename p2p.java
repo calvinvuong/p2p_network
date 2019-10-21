@@ -11,8 +11,8 @@ public class p2p {
     static int transferPort; // port num for transfers
     static ServerSocket welcomeNeighborSocket;
     static ServerSocket welcomeTransferSocket;
-    static ArrayList<InetAddress> IPConnections = new ArrayList<InetAddress>(); // list of IP addresses this peer currently has direct connection to
-    static ArrayList<Socket> sockets = new ArrayList<Socket>(); // a list of existing sockets to neighboring peers
+    static volatile List<InetAddress> IPConnections = Collections.synchronizedList(new ArrayList<InetAddress>()); // list of IP addresses this peer currently has direct connection to
+    static volatile List<Socket> sockets = Collections.synchronizedList(new ArrayList<Socket>()); // a list of existing sockets to neighboring peers
     
     public static void main(String[] args) {
 	System.out.println("Starting peer...");
@@ -75,13 +75,15 @@ public class p2p {
 		int neighborPort = Integer.parseInt(IPPortTuple[1]);
 
 		// check if there is already an established connection to the IP
-		if ( IPConnections.contains(neighborIP) ) 
-		    System.out.println("Connection to :" + neighborIP + " already exists.");
-		else {
-		    // give to ClientConnectThread to initiate socket connection
-		    Thread clientConnectThread = new Thread( new ClientConnectThread(neighborIP, neighborPort, IPConnections, sockets) );
-		    clientConnectThread.start();
-		}
+		synchronized(IPConnections) {
+		    if ( IPConnections.contains(neighborIP) ) 
+			System.out.println("Connection to :" + neighborIP + " already exists.");
+		    else {
+			// give to ClientConnectThread to initiate socket connection
+			Thread clientConnectThread = new Thread( new ClientConnectThread(neighborIP, neighborPort, IPConnections, sockets) );
+			clientConnectThread.start();
+		    }
+		} // close synchronized
 	    }
 	}
 	catch (Exception e) {
@@ -94,10 +96,10 @@ public class p2p {
 class WelcomeThread implements Runnable {
     ServerSocket welcomeNeighborSocket;
     ServerSocket welcomeTransferSocket;
-    ArrayList<InetAddress> IPConnections;
-    ArrayList<Socket> sockets;
+    volatile List<InetAddress> IPConnections;
+    volatile List<Socket> sockets;
     
-    public WelcomeThread(ServerSocket welcomeNeighbor, ServerSocket welcomeTransfer, ArrayList<InetAddress> neighborIPs, ArrayList<Socket> existingSockets) {
+    public WelcomeThread(ServerSocket welcomeNeighbor, ServerSocket welcomeTransfer, List<InetAddress> neighborIPs, List<Socket> existingSockets) {
 	welcomeNeighborSocket = welcomeNeighbor;
 	welcomeTransferSocket = welcomeTransfer;
 	IPConnections = neighborIPs;
@@ -128,10 +130,10 @@ class WelcomeThread implements Runnable {
 class ClientConnectThread implements Runnable {
     InetAddress neighborIP;
     int neighborPort;
-    ArrayList<InetAddress> IPConnections;
-    ArrayList<Socket> sockets;
+    volatile List<InetAddress> IPConnections;
+    volatile List<Socket> sockets;
 
-    public ClientConnectThread(InetAddress serverIP, int serverPort, ArrayList<InetAddress> neighborIPs, ArrayList<Socket> existingSockets) {
+    public ClientConnectThread(InetAddress serverIP, int serverPort, List<InetAddress> neighborIPs, List<Socket> existingSockets) {
 	neighborIP = serverIP;
 	neighborPort = serverPort;
 	IPConnections = neighborIPs;
@@ -158,13 +160,15 @@ class ClientConnectThread implements Runnable {
 
 // Handles operations relating to the an already-established socket between connected ppers
 class NeighborThread implements Runnable {
+    Boolean alive; // determines if this thread is still alive
     Socket connectionSocket;
     BufferedReader in; // in from neighbor
     DataOutputStream out; // out to neighbor
-    ArrayList<InetAddress> IPConnections;
-    ArrayList<Socket> sockets;
+    volatile List<InetAddress> IPConnections;
+    volatile List<Socket> sockets;
     
-    public NeighborThread(Socket connection, ArrayList<InetAddress> neighborIPs, ArrayList<Socket> existingSockets) {
+    public NeighborThread(Socket connection, List<InetAddress> neighborIPs, List<Socket> existingSockets) {
+	alive = new Boolean(true);
 	connectionSocket = connection;
 	IPConnections = neighborIPs;
 	sockets = existingSockets;
@@ -182,5 +186,9 @@ class NeighborThread implements Runnable {
     public void run() {
 	System.out.println("hi");
     }
-
 }
+
+// Handles heartbeat
+// Spawned by a NeighborThread
+//class HeartbeatThread implements Runnable {
+    
