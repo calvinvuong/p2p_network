@@ -34,7 +34,7 @@ public class p2p {
 	    welcomeTransferSocket = new ServerSocket(transferPort);
 
 	    // create therad to welcome connections
-	    Thread welcomeThread = new Thread( new WelcomeThread(welcomeNeighborSocket, welcomeTransferSocket, IPConnections, sockets, sent, received) );
+	    Thread welcomeThread = new Thread( new WelcomeThread(welcomeNeighborSocket, welcomeTransferSocket, localIP, transferPort, IPConnections, sockets, sent, received) );
 	    welcomeThread.start();
 
 	    // store user input
@@ -101,7 +101,7 @@ public class p2p {
 			System.out.println("Connection to :" + neighborIP + " already exists.");
 		    else {
 			// give to ClientConnectThread to initiate socket connection
-			Thread clientConnectThread = new Thread( new ClientConnectThread(neighborIP, neighborPort, IPConnections, sockets, sent, received) );
+			Thread clientConnectThread = new Thread( new ClientConnectThread(neighborIP, neighborPort, localIP, transferPort, IPConnections, sockets, sent, received) );
 			clientConnectThread.start();
 		    }
 		} // close synchronized
@@ -158,6 +158,9 @@ public class p2p {
 
 // Handles operations relating to welcome sockets
 class WelcomeThread implements Runnable {
+    InetAddress localIP;
+    int transferPort;
+    
     ServerSocket welcomeNeighborSocket;
     ServerSocket welcomeTransferSocket;
     final int HEARTBEAT_TIMEOUT = 12; // number of seconds to wait for heartbeat / or any other message
@@ -169,7 +172,9 @@ class WelcomeThread implements Runnable {
     // maps a relayed query_id to the first time it arrived at this peer
     volatile Map<String, Long> received;
 
-    public WelcomeThread(ServerSocket welcomeNeighbor, ServerSocket welcomeTransfer, List<InetAddress> neighborIPs, List<Socket> existingSockets, Map<String, InetAddress> sentList, Map<String, Long> receivedList) {
+    public WelcomeThread(ServerSocket welcomeNeighbor, ServerSocket welcomeTransfer, InetAddress hostIP, int hostTransferPort, List<InetAddress> neighborIPs, List<Socket> existingSockets, Map<String, InetAddress> sentList, Map<String, Long> receivedList) {
+	localIP = hostIP;
+	transferPort = hostTransferPort;
 	welcomeNeighborSocket = welcomeNeighbor;
 	welcomeTransferSocket = welcomeTransfer;
 	IPConnections = neighborIPs;
@@ -190,7 +195,7 @@ class WelcomeThread implements Runnable {
 		IPConnections.add(neighborSocket.getInetAddress());
 		sockets.add(neighborSocket);
 		
-		Thread neighborThread = new Thread( new NeighborThread(neighborSocket, IPConnections, sockets, sent, received) );
+		Thread neighborThread = new Thread( new NeighborThread(neighborSocket, localIP, transferPort, IPConnections, sockets, sent, received) );
 		neighborThread.start();
 	    }
 	    catch (Exception e) {
@@ -202,6 +207,8 @@ class WelcomeThread implements Runnable {
 
 // Handles operations to establish a "client" connection
 class ClientConnectThread implements Runnable {
+    InetAddress localIP;
+    int transferPort;
     InetAddress neighborIP;
     int neighborPort;
     final int HEARTBEAT_TIMEOUT = 12; // number of seconds to wait for heartbeat / or any other message
@@ -213,7 +220,9 @@ class ClientConnectThread implements Runnable {
     // maps a relayed query_id to the first time it arrived at this peer
     volatile Map<String, Long> received;
 
-    public ClientConnectThread(InetAddress serverIP, int serverPort, List<InetAddress> neighborIPs, List<Socket> existingSockets, Map<String, InetAddress> sentList, Map<String, Long> receivedList) {
+    public ClientConnectThread(InetAddress serverIP, int serverPort, InetAddress hostIP, int hostTransferPort, List<InetAddress> neighborIPs, List<Socket> existingSockets, Map<String, InetAddress> sentList, Map<String, Long> receivedList) {
+	localIP = hostIP;
+	transferPort = hostTransferPort;
 	neighborIP = serverIP;
 	neighborPort = serverPort;
 	IPConnections = neighborIPs;
@@ -233,7 +242,7 @@ class ClientConnectThread implements Runnable {
 	    IPConnections.add(neighborIP);
 	    sockets.add(connectionSocket);
 
-	    Thread neighborThread = new Thread( new NeighborThread(connectionSocket, IPConnections, sockets, sent, received) );
+	    Thread neighborThread = new Thread( new NeighborThread(connectionSocket, localIP, transferPort, IPConnections, sockets, sent, received) );
 	    neighborThread.start();
 	}
 	catch (ConnectException e) {
@@ -249,6 +258,10 @@ class ClientConnectThread implements Runnable {
 // Listens for heartbeats, queries, and responses
 class NeighborThread implements Runnable {
     volatile AtomicBoolean alive; // determines if this thread is still alive
+    // taken from main processes that starts this thread
+    InetAddress localIP;
+    int transferPort;
+    
     Socket connectionSocket;
     InetAddress neighborIP; 
     BufferedReader in; // in from neighbor
@@ -266,8 +279,10 @@ class NeighborThread implements Runnable {
     volatile Map<String, Long> received;
     
     
-    public NeighborThread(Socket connection, List<InetAddress> neighborIPs, List<Socket> existingSockets, Map<String, InetAddress> sentList, Map<String, Long> receivedList) {
+    public NeighborThread(Socket connection, InetAddress hostIP, int hostTransferPort, List<InetAddress> neighborIPs, List<Socket> existingSockets, Map<String, InetAddress> sentList, Map<String, Long> receivedList) {
 	alive = new AtomicBoolean(true);
+	localIP = hostIP;
+	transferPort = hostTransferPort;
 	connectionSocket = connection;
 	neighborIP = connectionSocket.getInetAddress();
 	IPConnections = neighborIPs;
@@ -418,11 +433,11 @@ class NeighborThread implements Runnable {
 	return false;
     }
 
-    // Sends queryhit to peer who sent this query
+    // Composes and sends queryhit to peer who sent this query
     public void queryHit(String query) {
 	String queryId = query.split(":|;")[1];
 	String fileName = query.split(":|;")[2];
-	String hitMessage = "R:" + queryId + ";" + fileName + "\n";
+	String hitMessage = "R:" + queryId + ";" + localIP + ":" + transferPort + ";" + fileName + "\n";
 	// put responseId in received
 	received.put("R" + queryId, System.currentTimeMillis());
 	try {
