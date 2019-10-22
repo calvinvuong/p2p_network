@@ -315,10 +315,12 @@ class NeighborThread implements Runnable {
 		}
 		// received query message from neighbor
 		else if ( incoming != null && incoming.startsWith("Q") ) {
-		    if ( containsFile(incoming) )
-			queryHit(incoming);
-		    else
-			relayQuery(incoming);
+		    if ( ! duplicateQuery(incoming) ) {
+			if ( containsFile(incoming) ) 
+			    queryHit(incoming);
+			else
+			    relayQuery(incoming);
+		    }
 		}
 	    }
 	    catch (SocketTimeoutException e) { // did not receive heartbeat for a while
@@ -341,26 +343,22 @@ class NeighborThread implements Runnable {
     // Sends the query to all neighbors connected to this peer
     public void relayQuery(String query) {
 	String queryId = query.split(":|;")[1];
-	// if query_id is duplicate, drop query
-	if ( ! duplicateQuery(query) ) {
-	    // update sent HashMap
-	    sent.put(queryId, neighborIP);
-	    synchronized(IPConnections) {
-		// relay query to all neighbors...
-		for ( int i = 0; i < sockets.size(); i++ ) {
-		    // ...except for neighbor who sent it
-		    if ( ! sockets.get(i).getInetAddress().equals(neighborIP) ) {
-			try {
-			    DataOutputStream out = new DataOutputStream(sockets.get(i).getOutputStream());
-			    out.writeBytes(query + "\n");
-			}
-			catch (IOException e) {
-			    e.printStackTrace();
-			}
+	// update sent HashMap
+	sent.put(queryId, neighborIP);
+	synchronized(IPConnections) {
+	    // relay query to all neighbors...
+	    for ( int i = 0; i < sockets.size(); i++ ) {
+		// ...except for neighbor who sent it
+		if ( ! sockets.get(i).getInetAddress().equals(neighborIP) ) {
+		    try {
+			DataOutputStream out = new DataOutputStream(sockets.get(i).getOutputStream());
+			out.writeBytes(query + "\n");
+		    }
+		    catch (IOException e) {
+			e.printStackTrace();
 		    }
 		}
 	    }
-
 	}
     }
 
