@@ -326,14 +326,13 @@ class NeighborThread implements Runnable {
 	    catch (SocketTimeoutException e) { // did not receive heartbeat for a while
 		System.out.println("Heartbeat Timeout");
 	    }
-	    /*
-	      catch (SocketException e) { // indicates socket closed
-	      //System.out.println(alive.get()); // diagnostic
-	      alive.set(false);
-	      System.out.println("Connection to " + neighborIP + " closed.");
-	      System.out.println(IPConnections);
-	      }
-	    */
+	    
+	    catch (SocketException e) { // indicates socket closed
+		//System.out.println(alive.get()); // diagnostic
+		alive.set(false);
+		System.out.println("Connection to " + neighborIP + " closed.");
+		System.out.println(IPConnections);
+	    }
 	    catch (Exception e) {
 		e.printStackTrace();
 	    }
