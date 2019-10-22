@@ -262,7 +262,7 @@ class NeighborThread implements Runnable {
 
     // maps a relayed query_id to the peer IP that forwarded the query to this peer
     volatile Map<String, InetAddress> sent;
-    // maps a relayed query_id to the first time it arrived at this peer
+    // maps a relayed query_id or response_id to the first time it arrived at this peer
     volatile Map<String, Long> received;
     
     
@@ -322,6 +322,15 @@ class NeighborThread implements Runnable {
 			    relayQuery(incoming);
 		    }
 		}
+		// received a queryhit message from neighbor
+		else if ( incoming != null && incoming.startsWith("R") ) {
+		    if ( ! duplicateQueryHit(incoming) ) {
+			if ( queryHitDestination(incoming) )
+			    setupTransfer(incoming);
+			else
+			    relayQueryHit(incoming);
+		    }
+		}
 	    }
 	    catch (SocketTimeoutException e) { // did not receive heartbeat for a while
 		System.out.println("Heartbeat Timeout");
@@ -331,7 +340,7 @@ class NeighborThread implements Runnable {
 		//System.out.println(alive.get()); // diagnostic
 		alive.set(false);
 		System.out.println("Connection to " + neighborIP + " closed.");
-		System.out.println(IPConnections);
+		//System.out.println(IPConnections);
 	    }
 	    catch (Exception e) {
 		e.printStackTrace();
@@ -364,7 +373,7 @@ class NeighborThread implements Runnable {
     // Checks if a query of the same ID has already been received at this peer recently
     // Adds query_id to HashMap of received queries
     public boolean duplicateQuery(String query) {
-	String queryId = query.split(":|;")[1];
+	String queryId = "Q" + query.split(":|;")[1];
 	// new query, or received another query with the same id a long time ago
 	if ( ! received.containsKey(queryId) || System.currentTimeMillis() - received.get(queryId) > RECEIVED_TIMEOUT * 1000 ) { 
 	    received.put(queryId, System.currentTimeMillis());
@@ -373,6 +382,19 @@ class NeighborThread implements Runnable {
 	return true;
     }
 
+    // Checks if a queryhit of the same ID has already been received at this peer recently
+    // Adds queryHitId to Hashmap of received queryhits
+    public boolean duplicateQueryHit(String query) {
+	String queryHitId = "R" + query.split(":|;")[1];
+	// new query, or received another query with the same id a long time ago
+	if ( ! received.containsKey(queryHitId) || System.currentTimeMillis() - received.get(queryHitId) > RECEIVED_TIMEOUT * 1000 ) { 
+	    received.put(queryHitId, System.currentTimeMillis());
+	    return false;
+	}
+	return true;
+    }
+
+    
     // Returns true if this peer contains the file specified in the query incoming
     // Returns false otherwise
     public boolean containsFile(String query) {
@@ -396,8 +418,53 @@ class NeighborThread implements Runnable {
 	return false;
     }
 
+    // Sends queryhit to peer who sent this query
     public void queryHit(String query) {
-	return;
+	String queryId = query.split(":|;")[1];
+	String fileName = query.split(":|;")[2];
+	String hitMessage = "R:" + queryId + ";" + fileName + "\n";
+	// put responseId in received
+	received.put("R" + queryId, System.currentTimeMillis());
+	try {
+	    out.writeBytes(hitMessage);
+	}
+	catch (IOException e) {
+	    e.printStackTrace();
+	}
+    }
+
+    // Returns true if the queryhit has reached its destination (i.e. the peer that originally sent the request)
+    public boolean queryHitDestination(String queryHit) {
+	String id = queryHit.split(":|;")[1];
+	if ( sent.containsKey(id) && sent.get(id) == null )
+	    return true;
+	return false;
+    }
+
+    //
+    public void relayQueryHit(String queryHit) {
+	String queryHitId = queryHit.split(":|;")[1];
+	// received hashmap has already been updated in duplicateQueryHit()
+	// get IP of peer who sent the corresponding query
+	InetAddress relayIP = sent.get(queryHitId);
+	// find socket to relayIP
+	synchronized(IPConnections) {
+	    for ( int i = 0; i < sockets.size(); i++ ) {
+		if ( sockets.get(i).getInetAddress().equals(relayIP) ) {
+		    try {
+			DataOutputStream out = new DataOutputStream(sockets.get(i).getOutputStream());
+			out.writeBytes(queryHit + "\n");
+		    }
+		    catch (IOException e) {
+			e.printStackTrace();
+		    }
+		}
+	    } // close sync
+	}
+    }
+    
+    public void setupTransfer(String queryHit) {
+	System.out.println(queryHit);
     }
     
     // Terminates connection between local host and one peer
