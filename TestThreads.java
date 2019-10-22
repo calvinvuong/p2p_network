@@ -16,6 +16,8 @@ public class TestThreads {
 	catch (Exception e) {
 	    e.printStackTrace();
 	}
+	String sample = "Q:query_id;file_name";
+	System.out.println(sample.split(":|;")[2]);
 	TestThreads app = new TestThreads();
 	app.runThreads();
     }
