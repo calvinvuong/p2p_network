@@ -386,11 +386,14 @@ class NeighborThread implements Runnable {
     }
 
     // Checks if a query of the same ID has already been received at this peer recently
+    // Returns true if query is a duplicate
     // Adds query_id to HashMap of received queries
     public boolean duplicateQuery(String query) {
 	String queryId = "Q" + query.split(":|;")[1];
+	if ( sent.containsKey(query.split(":|;")[1]) )  // prevent a query from looping back to peer that originally sent it
+	    return true;
 	// new query, or received another query with the same id a long time ago
-	if ( ! received.containsKey(queryId) || System.currentTimeMillis() - received.get(queryId) > RECEIVED_TIMEOUT * 1000 ) { 
+	else if ( ! received.containsKey(queryId) || System.currentTimeMillis() - received.get(queryId) > RECEIVED_TIMEOUT * 1000 ) { 
 	    received.put(queryId, System.currentTimeMillis());
 	    return false;
 	}
