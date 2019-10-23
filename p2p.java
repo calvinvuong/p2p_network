@@ -211,7 +211,7 @@ class ClientConnectThread implements Runnable {
     int transferPort;
     InetAddress neighborIP;
     int neighborPort;
-    final int HEARTBEAT_TIMEOUT = 12; // number of seconds to wait for heartbeat / or any other message
+    final int HEARTBEAT_TIMEOUT = 75; // number of seconds to wait for heartbeat / or any other message
     volatile List<InetAddress> IPConnections;
     volatile List<Socket> sockets;
 
@@ -526,7 +526,7 @@ class HeartbeatThread implements Runnable {
     InetAddress neighborIP;
     DataOutputStream out; // out ot neighbor
     String message; // heartbeat message
-    final int PULSE = 5; // seconds per heartbeat
+    final int PULSE = 30; // seconds per heartbeat
     
     List<InetAddress> IPConnections;
     
@@ -538,7 +538,7 @@ class HeartbeatThread implements Runnable {
 	neighborIP = connectionSocket.getInetAddress();
 
 	String localIP = connectionSocket.getLocalAddress().getHostAddress();
-	System.out.println(localIP);
+
 	message = "H:" + localIP + "\n";
 
     }
