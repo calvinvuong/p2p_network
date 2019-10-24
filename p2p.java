@@ -33,10 +33,14 @@ public class p2p {
 	    welcomeNeighborSocket = new ServerSocket(neighborPort);
 	    welcomeTransferSocket = new ServerSocket(transferPort);
 
-	    // create therad to welcome connections
-	    Thread welcomeThread = new Thread( new WelcomeThread(welcomeNeighborSocket, welcomeTransferSocket, localIP, transferPort, IPConnections, sockets, sent, received) );
+	    // create thread to welcome neighbor peer connections
+	    Thread welcomeThread = new Thread( new WelcomeThread(welcomeNeighborSocket, localIP, transferPort, IPConnections, sockets, sent, received) );
 	    welcomeThread.start();
 
+	    // create thread to welcome file transfer connections
+	    Thread welcomeTransferThread = new Thread( new WelcomeTransferThread(welcomeTransferSocket) );
+	    welcomeTransferThread.start();
+	    
 	    // store user input
 	    BufferedReader userInputBuffer = new BufferedReader( new InputStreamReader(System.in) );
 	    while (true) {
@@ -156,13 +160,12 @@ public class p2p {
 	
 }
 
-// Handles operations relating to welcome sockets
+// Handles welcoming neighbor peer connections
 class WelcomeThread implements Runnable {
     InetAddress localIP;
     int transferPort;
-    
     ServerSocket welcomeNeighborSocket;
-    ServerSocket welcomeTransferSocket;
+    
     final int HEARTBEAT_TIMEOUT = 75; // number of seconds to wait for heartbeat / or any other message
     volatile List<InetAddress> IPConnections;
     volatile List<Socket> sockets;
@@ -172,11 +175,10 @@ class WelcomeThread implements Runnable {
     // maps a relayed query_id to the first time it arrived at this peer
     volatile Map<String, Long> received;
 
-    public WelcomeThread(ServerSocket welcomeNeighbor, ServerSocket welcomeTransfer, InetAddress hostIP, int hostTransferPort, List<InetAddress> neighborIPs, List<Socket> existingSockets, Map<String, InetAddress> sentList, Map<String, Long> receivedList) {
+    public WelcomeThread(ServerSocket welcomeNeighbor, InetAddress hostIP, int tPort, List<InetAddress> neighborIPs, List<Socket> existingSockets, Map<String, InetAddress> sentList, Map<String, Long> receivedList) {
 	localIP = hostIP;
-	transferPort = hostTransferPort;
+	transferPort = tPort;
 	welcomeNeighborSocket = welcomeNeighbor;
-	welcomeTransferSocket = welcomeTransfer;
 	IPConnections = neighborIPs;
 	sockets = existingSockets;
 	sent = sentList;
@@ -205,6 +207,159 @@ class WelcomeThread implements Runnable {
     }
 }
 
+// Handles welcoming file transfer connections
+class WelcomeTransferThread implements Runnable {
+    ServerSocket welcomeTransferSocket;
+
+    public WelcomeTransferThread(ServerSocket welcomeTransfer) {
+	welcomeTransferSocket = welcomeTransfer;
+    }
+
+    @Override
+    public void run() {
+	while (true) {
+	    try {
+		Socket transferSocket = welcomeTransferSocket.accept();
+		Thread transferServerThread = new Thread( new TransferServerThread(transferSocket) );
+		transferServerThread.start();
+	    }
+	    catch (Exception e) {
+		e.printStackTrace();
+	    }
+	}
+    }
+}
+
+// Reads the file request and writes the file to socket
+class TransferServerThread implements Runnable {
+    Socket transferSocket;
+    BufferedReader in;
+    DataOutputStream out;
+    InetAddress client;
+    
+    public TransferServerThread(Socket transfer) {
+	transferSocket = transfer;
+	client = transferSocket.getInetAddress();
+	try {
+	    in = new BufferedReader(new InputStreamReader(transferSocket.getInputStream()));
+	    out = new DataOutputStream(transferSocket.getOutputStream());
+	}
+	catch (IOException e) {
+	    e.printStackTrace();
+	}
+
+    }
+
+    @Override
+    public void run() {
+	// read request
+	String request = "";
+	try {
+	    request = in.readLine();
+	}
+	catch (IOException e) {
+	    e.printStackTrace();
+	}
+	String fileName = request.split(":")[1];
+	// get file
+	System.out.println("Received file request for: " + fileName + " from peer: " + client);
+	if ( ! containsFile(fileName) ) {
+	    System.out.println("The requested file is not at this host.");
+	    try {
+		out.writeBytes(null);
+		transferSocket.close();
+	    }
+	    catch (IOException e) {
+		e.printStackTrace();
+	    }
+	}
+	else { // file found
+	    try {
+		File serveFile = new File("shared/" + fileName);
+		BufferedInputStream fileIn = new BufferedInputStream(new FileInputStream(serveFile));
+		byte[] fileBuffer = new byte[2048];
+		int bytesRead = fileIn.read(fileBuffer, 0, fileBuffer.length); // read file contents in fileBuffer
+		while (bytesRead > 0) {
+		    out.write(fileBuffer, 0, bytesRead); // write file bytes into socket
+		    bytesRead = fileIn.read(fileBuffer, 0, fileBuffer.length);
+		}
+		fileIn.close();
+		transferSocket.close();
+	    }
+	    catch (IOException e) {
+		e.printStackTrace();
+	    }
+	    System.out.println("File transfer: " + fileName + " completed to " + client);
+	}
+    }
+
+    // return true if requested file is listed in config_sharing.txt
+    // returns false otherwise
+    private boolean containsFile(String fileName) {
+	try {
+	    File configSharing = new File("config_sharing.txt");
+	    Scanner scan = new Scanner(configSharing);
+	    while (scan.hasNextLine()) {
+		String name = scan.nextLine();
+		if ( name.equals(fileName) )
+		    return true;
+	    }
+	}
+	catch (FileNotFoundException e) {
+	    e.printStackTrace();
+	}
+	return false;
+    }
+}
+
+// Writes the file request to socket and reads the file from socket
+class TransferClientThread implements Runnable {
+    InetAddress transferIP;
+    int transferPort;
+    String fileName;
+
+    Socket transferSocket;
+    BufferedInputStream in;
+    DataOutputStream out;
+    
+    public TransferClientThread(InetAddress serverIP, int serverPort, String file) {
+	transferIP = serverIP;
+	transferPort = serverPort;
+	fileName = file;
+	try {
+	    transferSocket = new Socket(transferIP, transferPort);
+	    in = new BufferedInputStream(transferSocket.getInputStream());
+	    out = new DataOutputStream(transferSocket.getOutputStream());
+	}
+	catch (IOException e) {
+	    e.printStackTrace();
+	}
+    }
+
+    @Override
+    public void run() {
+	// write request to server peer
+	try {
+	    out.writeBytes("T:" + fileName + "\n");
+	    // read file from server peer
+	    BufferedOutputStream receivedFile = new BufferedOutputStream(new FileOutputStream("obtained/" + fileName));
+	    byte[] fileBuffer = new byte[2048];
+	    int bytesRead = in.read(fileBuffer, 0, fileBuffer.length); // read socket contents into buffer
+	    while ( bytesRead > 0 ) {
+		receivedFile.write(fileBuffer, 0, bytesRead);
+		bytesRead = in.read(fileBuffer, 0, fileBuffer.length);
+	    }
+	    receivedFile.close();
+	    transferSocket.close();
+	}
+	catch (IOException e) {
+	    e.printStackTrace();
+	}
+	System.out.println("Successfully received file: " + fileName + " from: " + transferIP);
+    }
+
+}
+		
 // Handles operations to establish a "client" connection
 class ClientConnectThread implements Runnable {
     InetAddress localIP;
@@ -261,7 +416,6 @@ class NeighborThread implements Runnable {
     // taken from main processes that starts this thread
     InetAddress localIP;
     int transferPort;
-    
     Socket connectionSocket;
     InetAddress neighborIP; 
     BufferedReader in; // in from neighbor
@@ -279,10 +433,10 @@ class NeighborThread implements Runnable {
     volatile Map<String, Long> received;
     
     
-    public NeighborThread(Socket connection, InetAddress hostIP, int hostTransferPort, List<InetAddress> neighborIPs, List<Socket> existingSockets, Map<String, InetAddress> sentList, Map<String, Long> receivedList) {
+    public NeighborThread(Socket connection, InetAddress hostIP, int tPort, List<InetAddress> neighborIPs, List<Socket> existingSockets, Map<String, InetAddress> sentList, Map<String, Long> receivedList) {
 	alive = new AtomicBoolean(true);
 	localIP = hostIP;
-	transferPort = hostTransferPort;
+	transferPort = tPort;
 	connectionSocket = connection;
 	neighborIP = connectionSocket.getInetAddress();
 	IPConnections = neighborIPs;
@@ -459,7 +613,7 @@ class NeighborThread implements Runnable {
 	return false;
     }
 
-    //
+    // Sends the QueryHit to the immediate peer that forwarded the query
     public void relayQueryHit(String queryHit) {
 	String queryHitId = queryHit.split(":|;")[1];
 	// received hashmap has already been updated in duplicateQueryHit()
@@ -480,9 +634,22 @@ class NeighborThread implements Runnable {
 	    } // close sync
 	}
     }
-    
+
+    // Launches a thread to request file from peer
     public void setupTransfer(String queryHit) {
-	System.out.println(queryHit);
+	// server refers the the peer that has the file
+	try {
+	    InetAddress serverIP = InetAddress.getByName(queryHit.split(":|;")[2]);
+	    int serverPort = Integer.parseInt(queryHit.split(":|;")[3]);
+	    String fileName = queryHit.split(":|;")[4];
+	    
+	    Thread transferClientThread = new Thread( new TransferClientThread(serverIP, serverPort, fileName) );
+	    transferClientThread.start();
+	}
+	catch (UnknownHostException e) {
+	    e.printStackTrace();
+	}
+					  
     }
     
     // Terminates connection between local host and one peer
