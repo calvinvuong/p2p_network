@@ -163,7 +163,7 @@ class WelcomeThread implements Runnable {
     
     ServerSocket welcomeNeighborSocket;
     ServerSocket welcomeTransferSocket;
-    final int HEARTBEAT_TIMEOUT = 12; // number of seconds to wait for heartbeat / or any other message
+    final int HEARTBEAT_TIMEOUT = 75; // number of seconds to wait for heartbeat / or any other message
     volatile List<InetAddress> IPConnections;
     volatile List<Socket> sockets;
 
@@ -267,7 +267,7 @@ class NeighborThread implements Runnable {
     BufferedReader in; // in from neighbor
     DataOutputStream out; // out to neighbor
     long lastHeartbeat; // time in millsec of last heartbeat
-    final int HEARTBEAT_TIMEOUT = 12; // number of seconds to wait for heartbeat / or any other message
+    final int HEARTBEAT_TIMEOUT = 75; // number of seconds to wait for heartbeat / or any other message
     final int RECEIVED_TIMEOUT = 15; // number of seconds until a received query is considered old/out of network
     
     volatile List<InetAddress> IPConnections;
