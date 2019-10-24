@@ -594,7 +594,7 @@ class NeighborThread implements Runnable {
     public void queryHit(String query) {
 	String queryId = query.split(":|;")[1];
 	String fileName = query.split(":|;")[2];
-	String hitMessage = "R:" + queryId + ";" + localIP + ":" + transferPort + ";" + fileName + "\n";
+	String hitMessage = "R:" + queryId + ";" + localIP.getHostAddress() + ":" + transferPort + ";" + fileName + "\n";
 	// put responseId in received
 	received.put("R" + queryId, System.currentTimeMillis());
 	try {
