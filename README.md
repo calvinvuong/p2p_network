@@ -102,3 +102,15 @@ The threads in the program do the following things:
   * Initiates contact with a peer that it knows has the desired file and creates the socket.
   * Writes the file request to that socket.
   * Reads the file from the socket and writes the file to the `/obtained` folder.
+
+## Config Files
+### `config_peer.txt`
+* First line is the host of the peer. e.g. `eecslab-10.case.edu` This is so that a peer can get the IP address of the host it is running on.
+* Second line is the welcoming port for neighboring peer TCP connections.
+* Third line is the welcoming port for file transfer TCP connections.
+### `config_neighbors.txt`
+* Each line follows the format `neighbor_IP port_no`, where `neighbor_IP` is the IP address of one of this peer's neighbors, and `port_no` is the welcoming port number corresponding with that neighbor peer.
+* There is one line for each of the peer's neighbors.
+### `config_sharing.txt`
+* Each line is the file name of a file that exists in the p2p/shared directory.
+* This is the list of files that this peer can share with other peers in the p2p network.
