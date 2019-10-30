@@ -65,7 +65,7 @@
 * Clears the list of sockets and list of connected neighbor IP addresses.
 
 ### Exit
-Does the same thing as the `Leave` command, but also breaks out of the main program loop in `p2p`, which terminates the peer.
+Does the same thing as the `Leave` command, but also breaks out of the main program loop in `p2p` and terminates peers, which terminates the peer.
 
 ## Main Program and Threads
 

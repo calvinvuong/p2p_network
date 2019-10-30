@@ -45,12 +45,16 @@ public class p2p {
 	    BufferedReader userInputBuffer = new BufferedReader( new InputStreamReader(System.in) );
 	    while (true) {
 		String userInput = userInputBuffer.readLine();
-		if (userInput.equals("Connect"))
+		if (userInput.toLowerCase().equals("connect"))
 		    connectNeighbors();
-		else if (userInput.equals("Leave")) {
+		else if (userInput.toLowerCase().equals("leave")) {
 		    disconnectAllNeighbors();
 		}
-		else if (userInput.startsWith("Get")) {
+		else if (userInput.toLowerCase().equals("exit")) {
+		    disconnectAllNeighbors();
+		    break; // break out of while loop to exit program
+		}
+		else if (userInput.toLowerCase().startsWith("get")) {
 		    String requestedFile = userInput.split(" ")[1];
 		    sendQuery(requestedFile);
 		}
@@ -59,7 +63,8 @@ public class p2p {
 	catch (Exception e) {
 	    e.printStackTrace();
 	}
-
+	System.out.println("Program terminated.");
+	System.exit(0); // terminate this process (including all threads)
     }
     
 
@@ -644,6 +649,7 @@ class NeighborThread implements Runnable {
 	    String fileName = queryHit.split(":|;")[4];
 	    
 	    Thread transferClientThread = new Thread( new TransferClientThread(serverIP, serverPort, fileName) );
+	    System.out.println("Requesting file: " + fileName + " from: " + serverIP);
 	    transferClientThread.start();
 	}
 	catch (UnknownHostException e) {
