@@ -16,8 +16,8 @@ See file `topology.jpg` for the p2p network topology.
 
 ### Query Flooding / Relaying
 * Each peer has a table (HashMap) called `received`, which maps the ids of all the queries this peer has received to the time in milliseconds when it received it. **This allows each peer to check for duplicate queries and not relay queries it has already relayed**. 
-  * If a peer received a query whose id is already in the `received` table (and the time associated with receiving that query was in the last 15 seconds), then the peer knows it has already relayed this query forward and will drop the query.
-  * If a peer received a query whose id is not already in the `received` table *or* the id in the table was receive more than 15 seconds ago, then the peer knows this is a new query and will relay it to its neighbors. It will also insert a new entry into the `received` table indicating that this new query id has been received or update the received time.
+  * If a peer received a query whose id is already in the `received` table (and the time associated with receiving that query was in the last 3 seconds), then the peer knows it has already relayed this query forward and will drop the query.
+  * If a peer received a query whose id is not already in the `received` table *or* the id in the table was receive more than 3 seconds ago, then the peer knows this is a new query and will relay it to its neighbors. It will also insert a new entry into the `received` table indicating that this new query id has been received or update the received time.
 * Each peer also has a table (HashMap) called `sent`, which maps the ids of all queries this peer has sent or relayed forward to the IP address of the peer that this peer received the query from. This will allow for a queryhit to retrace the path back to the peer that originally sent the query. If the peer is sending an original "new" query, then the IP address field in the `sent` table will be `null`. 
 * Once a peer verifies a received query is new, it sends the query to all of its neighboring peers except for the peer that it read the query from.
   * Inserts a new entry into the table `sent`, mapping the query id to the IP address of the peer that this peer receieved the query from.
@@ -31,7 +31,7 @@ See file `topology.jpg` for the p2p network topology.
 * The peer writes the queryhit message to the socket connected to the "immediate neighbor."
 * Duplicate queryhits from multiple peers that own the requested file are handled so that one file request from a peer does not result in multiple file transfers:
   * When a peer receives a queryhit message, it will check in the `received` table whether or not this peer has already received the a queryhit message with the same id.
-    * If the `received` table already contains this queryhit id (received within the last 15 seconds), then it will drop the queryhit message and won't let it retrace back.
+    * If the `received` table already contains this queryhit id (received within the last 3 seconds), then it will drop the queryhit message and won't let it retrace back.
     * If the `received` table does not contain this queryhit id, then it will "act normally" and relay the queryhit to the "immediate neighbor" that sent the query.
       * It also inserts a new entry into the `received` table indicating that this queryhit id was already received and processed by the peer so that subsequent queryhits for the same thing are dropped.
   * The `received` table makes a distinction between received ids for queries and received ids for queryhits so that they are not mixed up. 
