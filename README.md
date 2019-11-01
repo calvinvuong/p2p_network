@@ -1,6 +1,10 @@
 # p2p_network
 **Calvin Vuong**
 
+## Network Topology
+See file `topology.jpg` for the p2p network topology.
+![alt text](topology.jpg "Network Topology")
+
 ## Implementation Specifics
 ### Query IDs
 * Each peer is allocated a range of 100,000,000 possible query ids, mutually exclusive from the other peers.
