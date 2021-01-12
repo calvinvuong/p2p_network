@@ -1,6 +1,25 @@
 # p2p_network
-**Calvin Vuong**
 An application to create a simple peer to peer network for transferring files between different hosts. Implemented in Java using the standard Java socket programming API. The application was tested using a set of six hosts in Case Western Reserve University's EECS lab servers.
+
+## Build and Run Instructions
+Perform the following steps to build and launch the p2p client on *each host (computer)* that you want to be part of the peer to peer network. 
+1. Create configuration files in base directory. They are described in the following section.
+2. Create new directories `shared` and `obtained` if they do not exist already. `shared` will contain all the files that this peer (host) can share with other peers in the p2p network. `obtained` will contain the files that this peer successfully requests from other peers in the network.
+3. Compile the code. `javac p2p.java`.
+4. Deploy the p2p client. `java p2p`.
+
+## Config Files
+Make sure all specified ports in configuration files are open for TCP connections. 
+### `config_peer.txt`
+* First line is the host running this instance of the p2p client. e.g. `eecslab-10.case.edu` This is so that the p2p client application can get the IP address of the host it is running on.
+* Second line is the welcoming port for neighboring peer TCP connections.
+* Third line is the welcoming port for file transfer TCP connections.
+### `config_neighbors.txt`
+* Each line follows the format `neighbor_IP port_no`, where `neighbor_IP` is the IP address of one of this peer's neighbors, and `port_no` is the welcoming port number corresponding with that neighbor peer.
+* There is one line for each of the peer's neighbors.
+### `config_sharing.txt`
+* Each line is the file name of a file that exists in the `p2p/shared` directory.
+* This is the list of files that this peer can share with other peers in the p2p network.
 
 ## Network Topology
 The p2p network topology is determined by each individual host's set of neighbor peers, which is specified in each host's configuration file. The network topology is not fixed. See file `topology.jpg` for an example of one of the p2p network topologies used to test the code. 
@@ -13,7 +32,6 @@ The p2p network topology is determined by each individual host's set of neighbor
 * The query id for each peer starts indexing at the value equal to `query_base = least significant digit of peer IP * 100,000,000`.
   * For example, since eecslab-10 is on 129.22.23.202, that peer is allowed to use query ids 200,000,000 to 299,999,999.
 * This ensures unique query ids as long as a single peer does not put more than 100,000,000 queries into the network before any of those queries results in a hit or is dropped.
-* I realize that this method of generating query ids will not work with more than 9 peers.
 
 ### Query Flooding / Relaying
 * Each peer has a table (HashMap) called `received`, which maps the ids of all the queries this peer has received to the time in milliseconds when it received it. **This allows each peer to check for duplicate queries and not relay queries it has already relayed**. 
@@ -107,15 +125,3 @@ The threads in the program do the following things:
   * Initiates contact with a peer that it knows has the desired file and creates the socket.
   * Writes the file request to that socket.
   * Reads the file from the socket and writes the file to the `/obtained` folder.
-
-## Config Files
-### `config_peer.txt`
-* First line is the host of the peer. e.g. `eecslab-10.case.edu` This is so that a peer can get the IP address of the host it is running on.
-* Second line is the welcoming port for neighboring peer TCP connections.
-* Third line is the welcoming port for file transfer TCP connections.
-### `config_neighbors.txt`
-* Each line follows the format `neighbor_IP port_no`, where `neighbor_IP` is the IP address of one of this peer's neighbors, and `port_no` is the welcoming port number corresponding with that neighbor peer.
-* There is one line for each of the peer's neighbors.
-### `config_sharing.txt`
-* Each line is the file name of a file that exists in the p2p/shared directory.
-* This is the list of files that this peer can share with other peers in the p2p network.
