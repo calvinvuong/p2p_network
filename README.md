@@ -1,8 +1,9 @@
 # p2p_network
 **Calvin Vuong**
+An application to create a simple peer to peer network for transferring files between different hosts. Implemented in Java using the standard Java socket programming API. The application was tested using a set of six hosts in Case Western Reserve University's EECS lab servers.
 
 ## Network Topology
-See file `topology.jpg` for the p2p network topology.
+The p2p network topology is determined by each individual host's set of neighbor peers, which is specified in each host's configuration file. The network topology is not fixed. See file `topology.jpg` for an example of one of the p2p network topologies used to test the code. 
 ![alt text](topology.jpg "Network Topology")
 
 ## Implementation Specifics
